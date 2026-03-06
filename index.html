@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Avaliador UX/IHC — Profa. Dra. Danielle Pompeu — UEA</title>
+<title>UXMind — Heuristic Evaluation Tool · Profa. Dra. Danielle Pompeu · UEA</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -33,11 +33,12 @@
   }
   header h1 {
     font-family: 'DM Serif Display', serif;
-    font-size: clamp(1.8rem, 4vw, 3rem);
-    letter-spacing: -0.02em;
+    font-size: clamp(2.2rem, 5vw, 3.8rem);
+    letter-spacing: -0.03em;
     line-height: 1.1;
   }
   header h1 span { color: var(--accent); font-style: italic; }
+  header h1 .mind { color: var(--accent3); font-style: normal; }
   header p.tagline { margin-top: 0.5rem; color: var(--muted); font-size: 0.9rem; font-weight: 300; }
   .header-meta {
     margin-top: 0.75rem;
@@ -646,7 +647,7 @@
 
 <!-- ══════════════════ HEADER ══════════════════ -->
 <header>
-  <h1>Avaliador <span>UX / IHC</span></h1>
+  <h1><span>UX</span><span class="mind">Mind</span></h1>
   <p class="tagline" data-i18n="tagline">Avaliação heurística científica · Nielsen · Bastien &amp; Scapin · WCAG 2.1 · Gestalt</p>
   <div class="header-meta">
     <span class="meta-author">👩‍🏫 Profa. Dra. Danielle Pompeu Noronha Pontes</span>
@@ -869,8 +870,8 @@
 <!-- ══════════════════ FOOTER ══════════════════ -->
 <footer>
   <p>
-    <strong>Avaliador UX/IHC</strong> · Instrumento pedagógico para avaliação heurística de interfaces<br>
-    Desenvolvido por <strong>Profa. Dra. Danielle Pompeu Noronha Pontes</strong> · Universidade do Estado do Amazonas — UEA · Disciplina de IHC
+    <strong>UXMind</strong> · AI-powered heuristic evaluation tool for HCI<br>
+    Profa. Dra. Danielle Pompeu Noronha Pontes · Universidade do Estado do Amazonas — UEA · IHC
   </p>
   <p style="margin-top:0.5rem; font-size:0.72rem; color:#3a3a55;">
     Nielsen (1994) · Bastien &amp; Scapin (1993) · W3C WCAG 2.1 (2018) · Wertheimer (1938)
@@ -1609,7 +1610,7 @@ function exportCSV() {
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const url1=URL.createObjectURL(blob);
   const a1=document.createElement('a'); a1.href=url1; a1.style.display='none';
-  a1.download=`avaliacao_ux_${(site||'sem_site').replace(/[^a-z0-9]/gi,'_')}_${date.replace(/\//g,'-')}.csv`;
+  a1.download=`uxmind_eval_${(site||'sem_site').replace(/[^a-z0-9]/gi,'_')}_${date.replace(/\//g,'-')}.csv`;
   document.body.appendChild(a1); a1.click();
   setTimeout(()=>{ document.body.removeChild(a1); URL.revokeObjectURL(url1); },200);
 }
@@ -1619,7 +1620,7 @@ function exportTXT() {
   const site=document.getElementById('projectName').value||'Não informado';
   const date=new Date().toLocaleDateString('pt-BR');
   const fwNames={nielsen:'HEURÍSTICAS DE NIELSEN',bastien:'CRITÉRIOS DE BASTIEN & SCAPIN',wcag:'ACESSIBILIDADE (WCAG 2.1)',gestalt:'PRINCÍPIOS DA GESTALT'};
-  let txt=`RELATÓRIO DE AVALIAÇÃO UX/IHC\n${'='.repeat(50)}\n`;
+  let txt=`UXMIND — HEURISTIC EVALUATION REPORT\n${'='.repeat(50)}\n`;
   txt+=`Avaliador : ${email}\nSite      : ${site}\nData      : ${date}\n${'='.repeat(50)}\n`;
   ['nielsen','bastien','wcag','gestalt'].forEach(fw=>{
     txt+=`\n${fwNames[fw]}\n${'-'.repeat(40)}\n`;
@@ -1632,7 +1633,7 @@ function exportTXT() {
   const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
   const url2=URL.createObjectURL(blob);
   const a2=document.createElement('a'); a2.href=url2; a2.style.display='none';
-  a2.download=`relatorio_ux_${(site||'sem_site').replace(/[^a-z0-9]/gi,'_')}.txt`;
+  a2.download=`uxmind_report_${(site||'sem_site').replace(/[^a-z0-9]/gi,'_')}.txt`;
   document.body.appendChild(a2); a2.click();
   setTimeout(()=>{ document.body.removeChild(a2); URL.revokeObjectURL(url2); },200);
 }
@@ -2130,7 +2131,7 @@ const I18N = {
     errLimitReached: '⏳ <strong>Free tier limit reached.</strong> The daily quota renews at midnight Pacific Time. Try again tomorrow or check your usage at <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a>.',
     errGeneric: '⚠️ Erro ao gerar análise:',
     // Footer
-    footerText: 'Instrumento pedagógico para avaliação heurística de interfaces',
+    footerText: 'AI-powered heuristic evaluation tool for HCI',
     footerDisclaimer: '🤖 <strong>Disclaimer IA:</strong> Esta ferramenta foi desenvolvida com o auxílio do modelo de linguagem Claude (Anthropic, 2025). Os referenciais teóricos, critérios de avaliação e conteúdo científico foram revisados e validados pela autora.',
   },
   en: {
@@ -2451,7 +2452,7 @@ function applyTranslations() {
 
   // Footer
   document.querySelector('footer p:first-child') && (document.querySelector('footer p:first-child').innerHTML =
-    `<strong>Avaliador UX/IHC</strong> · ${d.footerText}<br>
+    `<strong>UXMind</strong> · ${d.footerText}<br>
     Profa. Dra. Danielle Pompeu Noronha Pontes · Universidade do Estado do Amazonas — UEA · IHC`);
   document.querySelector('.footer-disclaimer') && (document.querySelector('.footer-disclaimer').innerHTML = d.footerDisclaimer);
 }
