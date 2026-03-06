@@ -17,7 +17,7 @@ export default async function handler(req) {
     });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'API Key não configurada no servidor.' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -28,29 +28,30 @@ export default async function handler(req) {
     const body = await req.json();
     const prompt = body.messages?.[0]?.content || '';
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
-
-    const upstream = await fetch(url, {
+    const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1000, temperature: 0.7 }
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1000,
+        stream: true,
+        messages: [{ role: 'user', content: prompt }],
       }),
     });
 
     if (!upstream.ok) {
       const err = await upstream.text();
       let message = err;
-      if (upstream.status === 429) {
-        message = 'LIMIT_REACHED';
-      }
+      if (upstream.status === 429) message = 'LIMIT_REACHED';
       return new Response(JSON.stringify({ error: message }), {
         status: upstream.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Transforma o stream do Gemini no formato SSE compatível com o frontend
+    // Transforma o stream da Groq (formato OpenAI) no formato SSE compatível com o frontend
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
@@ -75,7 +76,7 @@ export default async function handler(req) {
             if (!data || data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
-              const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+              const text = parsed?.choices?.[0]?.delta?.content;
               if (text) {
                 const chunk = JSON.stringify({
                   type: 'content_block_delta',
