@@ -1611,7 +1611,7 @@ function showToast(msg) {
 
 // ─── ANÁLISE IA ───────────────────────────────────────────────────────────────
 // 👇 Substitua pela URL do seu proxy na Vercel após o deploy
-const PROXY_URL = 'https://uxihc-proxy.vercel.app/api/claude';
+const PROXY_URL = 'COLE_AQUI_A_URL_DA_VERCEL';
 
 function buildIndividualPrompt() {
   const site = document.getElementById('projectName').value || 'não informado';
@@ -1655,63 +1655,154 @@ Use linguagem acadêmica acessível. Seja específico sobre o site avaliado. Má
 function buildClassPrompt(submissions) {
   const site = classSession?.site || 'não informado';
   const sessionName = classSession?.name || 'Turma';
-  const fwNames = {nielsen:'Nielsen',bastien:'Bastien & Scapin',wcag:'WCAG 2.1',gestalt:'Gestalt'};
+  const fwNames = {nielsen:'Heurísticas de Nielsen',bastien:'Critérios Ergonômicos de Bastien & Scapin',wcag:'Diretrizes WCAG 2.1',gestalt:'Princípios da Gestalt'};
+  const fwRefs = {
+    nielsen:'Nielsen (1994)',
+    bastien:'Bastien & Scapin (1993)',
+    wcag:'W3C WCAG 2.1 (2018)',
+    gestalt:'Wertheimer (1923)'
+  };
+  const scoreLabels = ['Péssimo (0)','Ruim (1)','Regular (2)','Bom (3)','Excelente (4)'];
 
-  // Calcular médias por critério (média das médias dos alunos)
-  const criterionAvgs = {};
+  // ── Médias e desvio padrão por critério ──
+  const criterionStats = {};
   ['nielsen','bastien','wcag','gestalt'].forEach(fw => {
     DATA[fw].items.forEach(item => {
-      let sum = 0, cnt = 0;
+      const scores = [];
+      const notes = [];
       submissions.forEach(sub => {
         const r = sub.ratings[item.id];
-        if (r && !r.na && r.score !== null) { sum += r.score; cnt++; }
+        if (r && !r.na && r.score !== null) {
+          scores.push(r.score);
+          if (r.notes && r.notes.trim()) notes.push(r.notes.trim());
+        }
       });
-      criterionAvgs[item.id] = cnt > 0 ? sum/cnt : null;
+      if (scores.length === 0) { criterionStats[item.id] = null; return; }
+      const avg = scores.reduce((a,b)=>a+b,0) / scores.length;
+      const variance = scores.reduce((a,b)=>a+(b-avg)**2,0) / scores.length;
+      const stddev = Math.sqrt(variance);
+      // Distribuição de notas
+      const dist = [0,0,0,0,0];
+      scores.forEach(s => dist[s]++);
+      criterionStats[item.id] = { avg, stddev, count: scores.length, dist, notes, fw, item };
     });
   });
 
-  // Top problemas e destaques
-  const allCriteria = [];
-  ['nielsen','bastien','wcag','gestalt'].forEach(fw => {
-    DATA[fw].items.forEach(item => {
-      const avg = criterionAvgs[item.id];
-      if (avg !== null) allCriteria.push({ fw, item, avg });
-    });
-  });
-  allCriteria.sort((a,b) => a.avg - b.avg);
-  const top5Problems = allCriteria.slice(0,5);
-  const top5Strengths = allCriteria.slice(-5).reverse();
-
-  // Médias por framework
+  // ── Médias por framework ──
   const fwAvgs = {};
   ['nielsen','bastien','wcag','gestalt'].forEach(fw => {
     let s=0, c=0;
     DATA[fw].items.forEach(item => {
-      const avg = criterionAvgs[item.id];
-      if (avg !== null) { s += avg; c++; }
+      const st = criterionStats[item.id];
+      if (st) { s += st.avg; c++; }
     });
     fwAvgs[fw] = c > 0 ? s/c : null;
   });
 
-  let prompt = `Você é um especialista em Usabilidade e IHC. Analise os resultados consolidados de ${submissions.length} alunos da disciplina "${sessionName}" que avaliaram o site "${site}".
+  // ── Ranking de critérios ──
+  const allStats = Object.values(criterionStats).filter(Boolean);
+  allStats.sort((a,b) => a.avg - b.avg);
 
-MÉDIAS POR FRAMEWORK (consenso da turma):
-${['nielsen','bastien','wcag','gestalt'].map(fw => `- ${fwNames[fw]}: ${fwAvgs[fw] !== null ? fwAvgs[fw].toFixed(2)+'/4' : 'N/A'}`).join('\n')}
+  // Críticos: média <= 1.5
+  const critical = allStats.filter(s => s.avg <= 1.5);
+  // Fracos: 1.5 < média <= 2.5
+  const weak = allStats.filter(s => s.avg > 1.5 && s.avg <= 2.5);
+  // Fortes: média >= 3.0
+  const strong = allStats.filter(s => s.avg >= 3.0).reverse();
+  // Alta divergência: desvio padrão >= 1.2
+  const divergent = allStats.filter(s => s.stddev >= 1.2).sort((a,b)=>b.stddev-a.stddev).slice(0,3);
 
-TOP 5 CRITÉRIOS MAIS PROBLEMÁTICOS (menor nota média da turma):
-${top5Problems.map(({item,avg}) => `- ${item.num} ${item.title}: ${avg.toFixed(2)}/4`).join('\n')}
+  // Coletar todas as observações escritas pelos alunos
+  const allNotes = [];
+  allStats.forEach(st => {
+    st.notes.forEach(n => allNotes.push(`[${st.item.num}] ${n}`));
+  });
 
-TOP 5 CRITÉRIOS MELHOR AVALIADOS:
-${top5Strengths.map(({item,avg}) => `- ${item.num} ${item.title}: ${avg.toFixed(2)}/4`).join('\n')}
+  // ── Montar prompt ──
+  let prompt = `Você é um especialista sênior em Usabilidade, IHC e Avaliação de Interfaces. Sua tarefa é produzir um relatório técnico de avaliação heurística consolidada, baseado nas respostas de ${submissions.length} avaliadores que analisaram o site "${site}".
 
-Gere um parecer pedagógico e técnico com:
-1. **Consenso da Turma** — o que os avaliadores concordaram sobre a interface
-2. **Problemas Críticos Identificados** — análise dos principais problemas com impacto UX
-3. **Pontos de Divergência** (se houver) — aspectos onde as opiniões variam
-4. **Recomendações Coletivas** — melhorias prioritárias baseadas no consenso
-5. **Síntese Pedagógica** — o que este exercício revela sobre a interface e sobre o aprendizado da turma
+A avaliação utilizou uma escala de 0 a 4 (0=Péssimo, 1=Ruim, 2=Regular, 3=Bom, 4=Excelente) aplicada a 4 frameworks científicos: ${Object.values(fwNames).join(', ')}.
 
-Linguagem acadêmica, objetiva e construtiva. Máximo 450 palavras.`;
+═══════════════════════════════════════
+DADOS CONSOLIDADOS DA AVALIAÇÃO
+═══════════════════════════════════════
+
+PONTUAÇÃO MÉDIA POR FRAMEWORK:
+${['nielsen','bastien','wcag','gestalt'].map(fw => {
+  const avg = fwAvgs[fw];
+  const pct = avg !== null ? (avg/4*100).toFixed(0)+'%' : 'N/A';
+  return `• ${fwNames[fw]} [${fwRefs[fw]}]: ${avg !== null ? avg.toFixed(2)+'/4 ('+pct+')' : 'Não avaliado'}`;
+}).join('\n')}
+
+`;
+
+  if (critical.length > 0) {
+    prompt += `CRITÉRIOS CRÍTICOS (média ≤ 1,5/4 — problemas graves):
+${critical.map(s => `• ${s.item.num} — ${s.item.title}: ${s.avg.toFixed(2)}/4 | DP=${s.stddev.toFixed(2)} | n=${s.count}
+  Definição: ${s.item.subtitle}`).join('\n')}
+
+`;
+  }
+
+  if (weak.length > 0) {
+    prompt += `CRITÉRIOS FRACOS (média entre 1,5 e 2,5/4 — problemas moderados):
+${weak.slice(0,6).map(s => `• ${s.item.num} — ${s.item.title}: ${s.avg.toFixed(2)}/4 | DP=${s.stddev.toFixed(2)}`).join('\n')}
+
+`;
+  }
+
+  if (strong.length > 0) {
+    prompt += `PONTOS FORTES (média ≥ 3,0/4 — aspectos bem avaliados):
+${strong.slice(0,6).map(s => `• ${s.item.num} — ${s.item.title}: ${s.avg.toFixed(2)}/4 | DP=${s.stddev.toFixed(2)}`).join('\n')}
+
+`;
+  }
+
+  if (divergent.length > 0) {
+    prompt += `CRITÉRIOS COM MAIOR DIVERGÊNCIA entre avaliadores (alto desvio padrão):
+${divergent.map(s => `• ${s.item.num} — ${s.item.title}: média=${s.avg.toFixed(2)}/4, DP=${s.stddev.toFixed(2)} — avaliadores discordaram significativamente`).join('\n')}
+
+`;
+  }
+
+  if (allNotes.length > 0) {
+    prompt += `OBSERVAÇÕES QUALITATIVAS DOS AVALIADORES (seleção):
+${allNotes.slice(0,10).map(n => `• "${n}"`).join('\n')}
+
+`;
+  }
+
+  prompt += `═══════════════════════════════════════
+INSTRUÇÕES PARA O RELATÓRIO
+═══════════════════════════════════════
+
+Com base EXCLUSIVAMENTE nos dados acima, produza um relatório técnico estruturado em português com as seguintes seções:
+
+**1. Panorama Geral da Interface**
+Síntese do desempenho global da interface avaliada, com base nas médias por framework. Interprete o que cada pontuação significa para a experiência do usuário. Indique se a interface apresenta desempenho satisfatório, regular ou insatisfatório de forma geral.
+
+**2. Pontos Fortes Identificados**
+Liste e explique os aspectos nos quais a interface se destacou positivamente segundo os avaliadores. Para cada ponto forte, explique por que isso beneficia o usuário com base no referencial teórico correspondente.
+
+**3. Principais Problemas e Pontos Fracos**
+Analise os critérios com piores avaliações. Para cada problema crítico ou fraco: (a) descreva o problema, (b) explique o impacto negativo na experiência do usuário, (c) indique o referencial teórico que fundamenta a criticidade deste problema.
+
+**4. Áreas de Divergência entre Avaliadores**
+Se houver critérios com alto desvio padrão, discuta o que essa divergência pode indicar sobre a interface ou sobre a complexidade da avaliação daquele aspecto.
+
+**5. Recomendações de Melhoria**
+Liste recomendações concretas e priorizadas por impacto, baseadas nos problemas identificados. Cada recomendação deve ser acionável e diretamente relacionada a um critério mal avaliado.
+
+**6. Conclusão**
+Síntese em 3-4 frases sobre o estado geral da interface e os próximos passos mais urgentes.
+
+REGRAS DE ESCRITA:
+- Use linguagem técnica e acadêmica, mas clara e objetiva
+- Cite os referenciais teóricos quando relevante (Nielsen, 1994; Bastien & Scapin, 1993; W3C, 2018)
+- Baseie-se nos dados fornecidos — não invente problemas não identificados pelos avaliadores
+- Se houver observações qualitativas, incorpore-as na análise como evidências
+- Máximo 600 palavras`;
+
   return prompt;
 }
 
